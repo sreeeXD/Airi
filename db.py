@@ -1,9 +1,17 @@
 import sqlite3
 import os
-from datetime import date, timedelta
+from datetime import datetime, timedelta
 import logging
+import pytz
  
 logger = logging.getLogger(__name__)
+TIMEZONE = pytz.timezone("Asia/Kolkata")
+ 
+def get_ist_today():
+    return str(datetime.now(TIMEZONE).date())
+ 
+def get_ist_yesterday():
+    return str(datetime.now(TIMEZONE).date() - timedelta(days=1))
  
 DB_PATH = os.path.join(os.path.dirname(__file__), "data", "hydration.db")
  
@@ -76,7 +84,7 @@ def set_setting(key, value):
  
  
 def reset_daily_if_needed():
-    today = str(date.today())
+    today = get_ist_today()
     conn = get_conn()
     c = conn.cursor()
     c.execute("INSERT OR IGNORE INTO daily_log (date, drink_count) VALUES (?, 0)", (today,))
@@ -85,7 +93,7 @@ def reset_daily_if_needed():
  
  
 def log_drink():
-    today = str(date.today())
+    today = get_ist_today()
     conn = get_conn()
     c = conn.cursor()
     c.execute("INSERT OR IGNORE INTO daily_log (date, drink_count) VALUES (?, 0)", (today,))
@@ -99,7 +107,7 @@ def log_drink():
  
  
 def get_today_count():
-    today = str(date.today())
+    today = get_ist_today()
     conn = get_conn()
     c = conn.cursor()
     c.execute("SELECT drink_count FROM daily_log WHERE date = ?", (today,))
@@ -109,7 +117,7 @@ def get_today_count():
  
  
 def update_streak():
-    yesterday = str(date.today() - timedelta(days=1))
+    yesterday = get_ist_yesterday()
     conn = get_conn()
     c = conn.cursor()
     c.execute("SELECT goal_met FROM daily_log WHERE date = ?", (yesterday,))

@@ -195,8 +195,11 @@ def should_send_reminder(hour: int, minute: int) -> bool:
     if get_skip_all():
         return False
  
-    if get_lab_mode() and hour == 11 and minute == 5:
-        return False
+    if hour == 11 and minute == 5:
+        weekday = datetime.now(TIMEZONE).weekday()
+        if weekday in [1, 3, 4] or get_lab_mode(): # Tue, Thu, Fri are continuous labs
+            logger.info("Skipping 11:05 reminder — lab day (auto or manual)")
+            return False
  
     busy_until = get_busy_until()
     if busy_until:

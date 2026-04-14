@@ -65,7 +65,7 @@ async def generate_good_morning(streak: int) -> str:
  
 Send a cheerful good morning message. {streak_context}
 Then ask if today's schedule is the same as usual or if anything has changed 
-(college 9am-3:40pm, short break at 11, lunch at 12:10).
+(college 9am-3:55pm, short break at 11am, lunch at 12:10pm).
 Keep it short and cute. End with something like 'just reply if anything's different today!'"""
  
         response = model.generate_content(prompt)
@@ -75,7 +75,7 @@ Keep it short and cute. End with something like 'just reply if anything's differ
         logger.error(f"Gemini morning message error: {e}")
         return (
             "Good morning! 🌅💙\n\n"
-            "Default schedule today? (college 9am-3:40pm, break at 11, lunch at 12:10)\n"
+            "Default schedule today? (college 9am-3:55pm, break at 11am, lunch at 12:10pm)\n"
             "Just reply if anything's different!"
         )
  
@@ -94,9 +94,9 @@ Parse their reply and extract schedule changes for today.
 User's reply: "{user_message}"
  
 Their default schedule:
-- College: 9:00 AM to 3:40 PM
-- Short break: 11:05 AM (skipped on lab days)
-- Lunch: 12:15 PM
+- College: 9:00 AM to 3:55 PM
+- Short break: 11:00 AM (skipped automatically on Tuesdays, Thursdays, Fridays due to labs)
+- Lunch: 12:10 PM
 - Reminders throughout the day
  
 Extract and return a JSON object with these fields (use null if not mentioned):

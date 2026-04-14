@@ -11,11 +11,11 @@ TIMEZONE = pytz.timezone("Asia/Kolkata")
  
 REMINDERS = [
     (7,  15, "morning"),
-    (9,  45, "college_start"),
-    (11,  5, "short_break"),
-    (12, 15, "lunch"),
-    (14, 30, "afternoon"),
-    (16,  0, "post_college"),
+    (8,  45, "pre_college"),    # Right before class starts at 9
+    (11,  5, "short_break"),    # Middle of 11:00-11:10 break
+    (12, 30, "lunch"),          # Middle of 12:10-12:55 lunch
+    (14,  0, "class_change"),   # Class transition at 1:55 PM
+    (16, 15, "post_college"),   # College ends at 3:55 PM
     (18, 30, "evening"),
     (21, 30, "night"),
 ]

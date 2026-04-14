@@ -311,7 +311,13 @@ async def send_reminder(app, escalation_level=0):
  
 def main():
     init_db()
-    app = Application.builder().token(BOT_TOKEN).build()
+    from telegram.request import HTTPXRequest
+    
+    # PythonAnywhere fix: Force HTTP/1.1 to prevent 503 ProxyErrors on their proxy server
+    proxy = os.environ.get("http_proxy") or os.environ.get("HTTP_PROXY")
+    t_request = HTTPXRequest(http_version="1.1", connection_pool_size=8, proxy_url=proxy)
+    
+    app = Application.builder().token(BOT_TOKEN).request(t_request).build()
  
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("status", status))

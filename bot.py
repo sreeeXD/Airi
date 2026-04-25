@@ -311,17 +311,7 @@ async def send_reminder(app, escalation_level=0):
  
 def main():
     init_db()
-    from telegram.request import HTTPXRequest
-    
-    # PythonAnywhere fix: Force explicitly defined proxy server
-    # Their bash consoles sometimes do not pass the http_proxy env var correctly to httpx
-    is_pythonanywhere = os.environ.get("USER") == "sreeXD" or "PYTHONANYWHERE_DOMAIN" in os.environ
-    if is_pythonanywhere:
-        proxy = "http://proxy.server:3128"
-        t_request = HTTPXRequest(http_version="1.1", connection_pool_size=8, proxy_url=proxy)
-        app = Application.builder().token(BOT_TOKEN).request(t_request).build()
-    else:
-        app = Application.builder().token(BOT_TOKEN).build()
+    app = Application.builder().token(BOT_TOKEN).build()
  
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("status", status))

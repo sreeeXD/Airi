@@ -15,7 +15,6 @@ def get_ist_yesterday():
 def get_conn():
     import pg8000
     url = os.getenv("DATABASE_URL")
-    # manual parse to avoid Python 3.13 urlparse bug
     url = url.replace("postgresql://", "").replace("postgres://", "")
     user_pass, rest = url.split("@", 1)
     host_port, dbname = rest.split("/", 1)
@@ -26,7 +25,6 @@ def get_conn():
         host=host, port=port, database=dbname,
         user=username, password=password, ssl_context=True
     )
-
 
 def init_db():
     conn = get_conn()
@@ -114,7 +112,7 @@ def should_send_reminder(hour, minute):
     busy = get_busy_until()
     if busy:
         try:
-            bh,bm = map(int,busy.split(":")); 
+            bh,bm = map(int,busy.split(":"))
             if now_time <= bh*60+bm: return False
         except: pass
     free = get_free_from()
@@ -126,7 +124,5 @@ def should_send_reminder(hour, minute):
     return True
 
 def midnight_reset_settings():
-    for fn in [lambda: set_lab_mode(False), lambda: set_checkin_done(False),
-               lambda: set_busy_until(""), lambda: set_free_from(""),
-               lambda: set_skip_all(False), lambda: set_awaiting_checkin_reply(False)]:
-        fn()
+    set_lab_mode(False); set_checkin_done(False); set_busy_until("")
+    set_free_from(""); set_skip_all(False); set_awaiting_checkin_reply(False)

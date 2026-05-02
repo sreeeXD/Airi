@@ -13,18 +13,9 @@ def get_ist_yesterday():
     return str(datetime.now(TIMEZONE).date() - timedelta(days=1))
 
 def get_conn():
-    import pg8000
-    url = os.getenv("DATABASE_URL")
-    url = url.replace("postgresql://", "").replace("postgres://", "")
-    user_pass, rest = url.split("@", 1)
-    host_port, dbname = rest.split("/", 1)
-    username, password = user_pass.split(":", 1)
-    host = host_port.split(":")[0]
-    port = int(host_port.split(":")[1]) if ":" in host_port else 5432
-    return pg8000.connect(
-        host=host, port=port, database=dbname,
-        user=username, password=password, ssl_context=True
-    )
+    import psycopg2
+    return psycopg2.connect(os.getenv("DATABASE_URL"))
+
 
 def init_db():
     conn = get_conn()
@@ -125,4 +116,4 @@ def should_send_reminder(hour, minute):
 
 def midnight_reset_settings():
     set_lab_mode(False); set_checkin_done(False); set_busy_until("")
-    set_free_from(""); set_skip_all(False); set_awaiting_checkin_reply(False)
+    set_free_from(""); set_skip_all(False); set_awaiting_checkin_reply(False)	

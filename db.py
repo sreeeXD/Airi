@@ -13,9 +13,18 @@ def get_ist_yesterday():
     return str(datetime.now(TIMEZONE).date() - timedelta(days=1))
 
 def get_conn():
-    import psycopg2
-    return psycopg2.connect(os.getenv("DATABASE_URL"))
-
+    import pg8000.native
+    import urllib.parse
+    url = os.getenv("DATABASE_URL")
+    r = urllib.parse.urlparse(url.replace("postgresql://", "http://").replace("postgres://", "http://"))
+    return pg8000.native.Connection(
+        host=r.hostname,
+        port=r.port or 5432,
+        database=r.path[1:],
+        user=r.username,
+        password=urllib.parse.unquote(r.password),
+        ssl_context=True
+    )
 
 def init_db():
     conn = get_conn()

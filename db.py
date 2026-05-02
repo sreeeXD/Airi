@@ -14,16 +14,19 @@ def get_ist_yesterday():
 
 def get_conn():
     import pg8000
-    import urllib.parse as up
-    r = up.urlparse(os.getenv("DATABASE_URL"))
+    url = os.getenv("DATABASE_URL")
+    # manual parse to avoid Python 3.13 urlparse bug
+    url = url.replace("postgresql://", "").replace("postgres://", "")
+    user_pass, rest = url.split("@", 1)
+    host_port, dbname = rest.split("/", 1)
+    username, password = user_pass.split(":", 1)
+    host = host_port.split(":")[0]
+    port = int(host_port.split(":")[1]) if ":" in host_port else 5432
     return pg8000.connect(
-        host=r.hostname,
-        port=r.port or 5432,
-        database=r.path[1:],
-        user=r.username,
-        password=r.password,
-        ssl_context=True
+        host=host, port=port, database=dbname,
+        user=username, password=password, ssl_context=True
     )
+
 
 def init_db():
     conn = get_conn()

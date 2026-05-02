@@ -2,6 +2,8 @@ import os
 import logging
 from datetime import datetime, timedelta
 import pytz
+import pg8000
+import urllib.parse
 
 logger = logging.getLogger(__name__)
 TIMEZONE = pytz.timezone("Asia/Kolkata")
@@ -13,11 +15,9 @@ def get_ist_yesterday():
     return str(datetime.now(TIMEZONE).date() - timedelta(days=1))
 
 def get_conn():
-    import pg8000.native
-    import urllib.parse
     url = os.getenv("DATABASE_URL")
     r = urllib.parse.urlparse(url.replace("postgresql://", "http://").replace("postgres://", "http://"))
-    return pg8000.native.Connection(
+    return pg8000.connect(
         host=r.hostname,
         port=r.port or 5432,
         database=r.path[1:],
@@ -27,17 +27,14 @@ def get_conn():
     )
 
 def init_db():
-    conn = get_conn()
-    c = conn.cursor()
-    c.execute("""CREATE TABLE IF NOT EXISTS daily_log (
-        date TEXT PRIMARY KEY, drink_count INTEGER DEFAULT 0, goal_met INTEGER DEFAULT 0)""")
-    c.execute("""CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)""")
-    c.execute("""CREATE TABLE IF NOT EXISTS streak (
-        id INTEGER PRIMARY KEY, current_streak INTEGER DEFAULT 0, last_goal_date TEXT)""")
+    conn = get_conn(); c = conn.cursor()
+    c.execute("CREATE TABLE IF NOT EXISTS daily_log (date TEXT PRIMARY KEY, drink_count INTEGER DEFAULT 0, goal_met INTEGER DEFAULT 0)")
+    c.execute("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)")
+    c.execute("CREATE TABLE IF NOT EXISTS streak (id INTEGER PRIMARY KEY, current_streak INTEGER DEFAULT 0, last_goal_date TEXT)")
     defaults = [("lab_mode","0"),("checkin_done","0"),("busy_until",""),
                 ("free_from",""),("skip_all_today","0"),("awaiting_checkin_reply","0")]
     for key, value in defaults:
-        c.execute("INSERT INTO settings (key,value) VALUES (%s,%s) ON CONFLICT (key) DO NOTHING", (key,value))
+        c.execute("INSERT INTO settings (key,value) VALUES (%s,%s) ON CONFLICT (key) DO NOTHING", (key, value))
     c.execute("INSERT INTO streak (id,current_streak) VALUES (1,0) ON CONFLICT (id) DO NOTHING")
     conn.commit(); conn.close()
     logger.info("DB initialized")
@@ -125,4 +122,4 @@ def should_send_reminder(hour, minute):
 
 def midnight_reset_settings():
     set_lab_mode(False); set_checkin_done(False); set_busy_until("")
-    set_free_from(""); set_skip_all(False); set_awaiting_checkin_reply(False)	
+    set_free_from(""); set_skip_all(False); set_awaiting_checkin_reply(False)

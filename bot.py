@@ -279,24 +279,23 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # Phase 3: detect snooze or drank intent from any message
-    if pending_reminder["active"]:
-        intent = await detect_snooze_intent(user_text)
+    intent = await detect_snooze_intent(user_text)
 
-        if intent.get("is_drank"):
-            log_drink()
-            count = get_today_count()
-            pending_reminder["active"] = False
-            pending_reminder["level"] = 0
-            response = await generate_verification_response(True, count)
-            await update.message.reply_text(response)
-            return
+    if intent.get("is_drank"):
+        log_drink()
+        count = get_today_count()
+        pending_reminder["active"] = False
+        pending_reminder["level"] = 0
+        response = await generate_verification_response(True, count)
+        await update.message.reply_text(response)
+        return
 
-        if intent.get("is_snooze"):
-            minutes = intent.get("minutes", 10)
-            await _do_snooze(context.application, minutes)
-            response = await generate_snooze_response(minutes)
-            await update.message.reply_text(response)
-            return
+    if intent.get("is_snooze") and pending_reminder["active"]:
+        minutes = intent.get("minutes", 10)
+        await _do_snooze(context.application, minutes)
+        response = await generate_snooze_response(minutes)
+        await update.message.reply_text(response)
+        return
 
 
 # ── Inline button callbacks ───────────────────────────────────────────────────

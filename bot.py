@@ -129,6 +129,53 @@ async def streak_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"Streak: {streak} days 🏆 This is actually impressive!!")
 
 
+async def next_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    from datetime import datetime
+    import pytz
+    TIMEZONE = pytz.timezone("Asia/Kolkata")
+    now = datetime.now(TIMEZONE)
+    now_mins = now.hour * 60 + now.minute
+    weekday = now.weekday()
+
+    REMINDERS = [
+        (7, 15, "morning"),
+        (9, 45, "college start"),
+        (11, 5, "short break"),
+        (12, 20, "lunch"),
+        (14, 30, "afternoon"),
+        (16, 10, "post college"),
+        (18, 30, "evening"),
+        (21, 30, "night"),
+    ]
+
+    from db import should_send_reminder
+    next_reminder = None
+    for hour, minute, label in REMINDERS:
+        slot_mins = hour * 60 + minute
+        if slot_mins > now_mins and should_send_reminder(hour, minute):
+            next_reminder = (hour, minute, label)
+            break
+
+    if next_reminder:
+        h, m, label = next_reminder
+        # Calculate time remaining
+        diff = (h * 60 + m) - now_mins
+        hrs = diff // 60
+        mins = diff % 60
+        time_str = f"{h:02d}:{m:02d}"
+        if hrs > 0:
+            remaining = f"{hrs}h {mins}m"
+        else:
+            remaining = f"{mins} mins"
+        await update.message.reply_text(
+            f"Next reminder: {time_str} ({label}) ⏰\nThat's in {remaining}!"
+        )
+    else:
+        await update.message.reply_text(
+            "No more reminders today! 🌙\nGet some rest and drink water before bed 💧"
+        )
+
+
 async def snooze_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not pending_reminder["active"]:
         await update.message.reply_text("No active reminder to snooze! But drink water anyway 💧")
@@ -330,6 +377,7 @@ def main():
     app.add_handler(CommandHandler("free", free_command))
     app.add_handler(CommandHandler("holiday", holiday_command))
     app.add_handler(CommandHandler("streak", streak_command))
+    app.add_handler(CommandHandler("next", next_command))
     app.add_handler(CommandHandler("snooze", snooze_command))
     app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
     app.add_handler(MessageHandler(filters.VIDEO | filters.VIDEO_NOTE, handle_video))
@@ -344,3 +392,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+# This will be inserted - see below

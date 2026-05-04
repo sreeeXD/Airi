@@ -7,7 +7,8 @@ from scheduler import start_scheduler
 from db import (init_db, log_drink, get_today_count, get_streak,
                 set_lab_mode, get_lab_mode, set_checkin_done, get_checkin_done,
                 set_awaiting_checkin_reply, get_awaiting_checkin_reply,
-                set_busy_until, set_free_from, set_skip_all, midnight_reset_settings)
+                set_busy_until, set_free_from, set_skip_all, midnight_reset_settings,
+                should_send_reminder)
 from ai_agent import (generate_reminder, generate_verification_response,
                       verify_proof_image, generate_good_morning,
                       parse_schedule_reply, generate_schedule_confirmation,
@@ -24,7 +25,8 @@ BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 CHAT_ID = int(os.getenv("TELEGRAM_CHAT_ID"))
 
 pending_reminder = {"active": False, "level": 0}
-MAX_ESCALATION = 3  # Phase 3: panic mode at level 3
+MAX_ESCALATION = 3
+DAILY_GOAL = 8
 
 
 # ── Commands ──────────────────────────────────────────────────────────────────
@@ -35,15 +37,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Commands:\n"
         "/status — today's progress\n"
         "/drank — log a glass manually\n"
-        "/lab — toggle lab mode (skips 11am)\n"
+        "/lab — skip reminders for 3hrs (lab mode)\n"
         "/busy HH:MM — busy until that time\n"
         "/free HH:MM — free from that time\n"
         "/holiday — skip all reminders today\n"
         "/streak — see your streak\n"
+        "/next — when's my next reminder\n"
         "/snooze — give me 10 mins\n\n"
-        "You can also just TEXT me naturally:\n"
-        "• 'give me 5' → snooze 5 mins\n"
-        "• 'done' → log a drink\n"
+        "Or just text me naturally:\n"
+        "• 'give me 5' → snooze\n"
+        "• 'drank' / 'done' → log a drink\n"
         "• Send a photo/video as proof 💙"
     )
 
@@ -51,9 +54,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     count = get_today_count()
     streak = get_streak()
-    bar = "💧" * count + "○" * max(0, 8 - count)
+    bar = "💧" * min(count, DAILY_GOAL) + "○" * max(0, DAILY_GOAL - count)
+    extra = f" (+{count - DAILY_GOAL} extra!)" if count > DAILY_GOAL else ""
     await update.message.reply_text(
-        f"Today: {bar}\n{count}/8 glasses\n\nStreak: {streak} day(s) 🔥\nLab mode: {'ON' if get_lab_mode() else 'OFF'}"
+        f"Today: {bar}{extra}\n{count}/{DAILY_GOAL} glasses\n\n"
+        f"Streak: {streak} day(s) 🔥\nLab mode: {'ON' if get_lab_mode() else 'OFF'}"
     )
 
 
@@ -70,17 +75,27 @@ async def drank_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Okay okay I'll stop nagging... for now 😏 #{} done!",
     ]
     msg = random.choice(responses).format(count)
-    if count >= 8:
+    if count == DAILY_GOAL:
         msg += "\n\n🎉 You hit your daily goal!! I'm so proud of you!"
     await update.message.reply_text(msg)
 
 
 async def lab_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    current = get_lab_mode()
-    set_lab_mode(not current)
+    """Lab mode: busy for 3 hours from now"""
+    from datetime import datetime
+    import pytz
+    TIMEZONE = pytz.timezone("Asia/Kolkata")
+    now = datetime.now(TIMEZONE)
+    end_hour = now.hour + 3
+    end_min = now.minute
+    if end_hour >= 24:
+        end_hour = 23
+        end_min = 59
+    busy_time = f"{end_hour:02d}:{end_min:02d}"
+    set_busy_until(busy_time)
+    set_lab_mode(True)
     await update.message.reply_text(
-        "Lab mode ON 🔬 I'll skip the 11am reminder today." if not current
-        else "Lab mode OFF. 11am reminder is back on!"
+        f"Lab mode ON 🔬 I'll skip all reminders until {busy_time} (3 hours from now)."
     )
 
 
@@ -135,45 +150,22 @@ async def next_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     TIMEZONE = pytz.timezone("Asia/Kolkata")
     now = datetime.now(TIMEZONE)
     now_mins = now.hour * 60 + now.minute
-    weekday = now.weekday()
 
-    REMINDERS = [
-        (7, 15, "morning"),
-        (9, 45, "college start"),
-        (11, 5, "short break"),
-        (12, 20, "lunch"),
-        (14, 30, "afternoon"),
-        (16, 10, "post college"),
-        (18, 30, "evening"),
-        (21, 30, "night"),
-    ]
-
-    from db import should_send_reminder
+    from scheduler import REMINDERS
     next_reminder = None
-    for hour, minute, label in REMINDERS:
-        slot_mins = hour * 60 + minute
-        if slot_mins > now_mins and should_send_reminder(hour, minute):
+    for hour, minute, label, *_ in REMINDERS:
+        if hour * 60 + minute > now_mins and should_send_reminder(hour, minute):
             next_reminder = (hour, minute, label)
             break
 
     if next_reminder:
         h, m, label = next_reminder
-        # Calculate time remaining
         diff = (h * 60 + m) - now_mins
-        hrs = diff // 60
-        mins = diff % 60
-        time_str = f"{h:02d}:{m:02d}"
-        if hrs > 0:
-            remaining = f"{hrs}h {mins}m"
-        else:
-            remaining = f"{mins} mins"
-        await update.message.reply_text(
-            f"Next reminder: {time_str} ({label}) ⏰\nThat's in {remaining}!"
-        )
+        hrs, mins = diff // 60, diff % 60
+        remaining = f"{hrs}h {mins}m" if hrs > 0 else f"{mins} mins"
+        await update.message.reply_text(f"Next reminder: {h:02d}:{m:02d} ({label}) ⏰\nThat's in {remaining}!")
     else:
-        await update.message.reply_text(
-            "No more reminders today! 🌙\nGet some rest and drink water before bed 💧"
-        )
+        await update.message.reply_text("No more reminders today! 🌙\nDrink water before bed 💧")
 
 
 async def snooze_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -234,21 +226,15 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Phase 3: Handle video proof"""
     await update.message.reply_text("Checking your video proof... 🎥🔍")
     video = update.message.video or update.message.video_note
-    file = await context.bot.get_file(video.file_id)
-    file_bytes = await file.download_as_bytearray()
-
-    # Extract thumbnail frame for vision verification
-    thumb = video.thumbnail if hasattr(video, 'thumbnail') and video.thumbnail else None
+    thumb = getattr(video, 'thumbnail', None)
     if thumb:
         thumb_file = await context.bot.get_file(thumb.file_id)
         thumb_bytes = await thumb_file.download_as_bytearray()
         verified = await verify_proof_image(bytes(thumb_bytes), "image/jpeg")
     else:
-        # If no thumbnail, give benefit of the doubt for videos
-        verified = True
+        verified = True  # benefit of doubt if no thumbnail
 
     if verified:
         log_drink()
@@ -262,10 +248,9 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Phase 3: Natural language snooze + schedule replies"""
-    user_text = update.message.text
+    user_text = update.message.text.strip()
 
-    # If waiting for schedule reply, handle that first
+    # Schedule reply
     if get_awaiting_checkin_reply():
         await update.message.reply_text("Let me check that... 🤔")
         parsed = await parse_schedule_reply(user_text)
@@ -278,24 +263,38 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(confirmation)
         return
 
-    # Phase 3: detect snooze or drank intent from any message
-    intent = await detect_snooze_intent(user_text)
+    # Natural language intent detection
+    try:
+        intent = await detect_snooze_intent(user_text)
+        logger.info(f"Intent detected: {intent}")
 
-    if intent.get("is_drank"):
-        log_drink()
-        count = get_today_count()
-        pending_reminder["active"] = False
-        pending_reminder["level"] = 0
-        response = await generate_verification_response(True, count)
-        await update.message.reply_text(response)
-        return
+        if intent.get("is_drank"):
+            log_drink()
+            count = get_today_count()
+            pending_reminder["active"] = False
+            pending_reminder["level"] = 0
+            import random
+            responses = [
+                f"Logged! 💙 That's {count}/8 today!",
+                f"Yay!! #{count} done! 💧",
+                f"Good job!! {count}/8 glasses 💙",
+            ]
+            msg = random.choice(responses)
+            if count == DAILY_GOAL:
+                msg += " 🎉 Daily goal hit!!"
+            await update.message.reply_text(msg)
+            return
 
-    if intent.get("is_snooze") and pending_reminder["active"]:
-        minutes = intent.get("minutes", 10)
-        await _do_snooze(context.application, minutes)
-        response = await generate_snooze_response(minutes)
-        await update.message.reply_text(response)
-        return
+        if intent.get("is_snooze") and pending_reminder["active"]:
+            minutes = intent.get("minutes", 10)
+            await _do_snooze(context.application, minutes)
+            response = await generate_snooze_response(minutes)
+            await update.message.reply_text(response)
+            return
+
+    except Exception as e:
+        logger.error(f"Intent detection failed: {e}")
+        # Silent fail — don't confuse user
 
 
 # ── Inline button callbacks ───────────────────────────────────────────────────
@@ -309,7 +308,10 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         count = get_today_count()
         pending_reminder["active"] = False
         pending_reminder["level"] = 0
-        await query.edit_message_text(f"Logged! 💙 That's {count}/8 glasses today.")
+        msg = f"Logged! 💙 That's {count}/8 glasses today."
+        if count == DAILY_GOAL:
+            msg += " 🎉 Daily goal hit!!"
+        await query.edit_message_text(msg)
 
     elif query.data == "snooze":
         await query.edit_message_text("Okay, 10 minutes... ⏰")
@@ -334,6 +336,11 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ── Reminder sender ───────────────────────────────────────────────────────────
 
 async def send_reminder(app, escalation_level=0):
+    # Don't spam if already over goal
+    if get_today_count() >= DAILY_GOAL:
+        pending_reminder["active"] = False
+        return
+
     pending_reminder["active"] = True
     pending_reminder["level"] = escalation_level
 
@@ -351,7 +358,6 @@ async def send_reminder(app, escalation_level=0):
     await app.bot.send_message(chat_id=CHAT_ID, text=message,
                                reply_markup=InlineKeyboardMarkup(keyboard))
 
-    # Auto-escalate after 1 min if ignored
     async def check_if_ignored():
         await asyncio.sleep(60)
         if pending_reminder["active"]:
@@ -385,10 +391,9 @@ def main():
 
     start_scheduler(app, send_reminder, send_checkin)
 
-    logger.info("Hydration bot started — Phase 3!")
+    logger.info("Hydration bot started — Phase 3 fixed!")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
 if __name__ == "__main__":
     main()
-# This will be inserted - see below

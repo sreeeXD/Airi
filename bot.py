@@ -264,6 +264,17 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # Natural language intent detection
+    # Pre-filter with keywords to avoid unnecessary Gemini calls
+    DRANK_KEYWORDS = ["drank", "done", "drunk", "drank it", "had water", "finished", "drinking", "drank water", "i drank", "had some"]
+    SNOOZE_KEYWORDS = ["wait", "busy", "later", "hold on", "give me", "snooze", "mins", "minutes", "sec", "in a bit", "not now", "rn", "5", "10"]
+    
+    lower = user_text.lower()
+    likely_drank = any(k in lower for k in DRANK_KEYWORDS)
+    likely_snooze = any(k in lower for k in SNOOZE_KEYWORDS)
+    
+    if not likely_drank and not likely_snooze:
+        return  # not a relevant message, skip Gemini call
+    
     try:
         intent = await detect_snooze_intent(user_text)
         logger.info(f"Intent detected: {intent}")

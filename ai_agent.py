@@ -8,8 +8,8 @@ from dotenv import load_dotenv
 load_dotenv()
 logger = logging.getLogger(__name__)
 
-TEXT_MODEL = "gemini-1.5-flash-latest"
-VISION_MODEL = "gemini-1.5-flash-latest"
+TEXT_MODEL = "gemini-1.5-flash"
+VISION_MODEL = "gemini-1.5-flash"
 
 # ── API key rotation ──────────────────────────────────────────────────────────
 

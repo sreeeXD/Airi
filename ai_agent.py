@@ -9,8 +9,8 @@ logger = logging.getLogger(__name__)
 
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
-TEXT_MODEL = "gemini-1.5-flash"
-VISION_MODEL = "gemini-1.5-flash"
+TEXT_MODEL = "gemini-2.0-flash"
+VISION_MODEL = "gemini-2.0-flash"
 
 PERSONA = """You are a caring, slightly dramatic girlfriend who is VERY concerned about her boyfriend's water intake 
 because he almost got kidney stones before. You genuinely care about his health.
